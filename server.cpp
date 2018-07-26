@@ -60,7 +60,7 @@ void handleConnection(int newsockfd, sockaddr_in *cli_addr, int nb)
     int n;
     int k = 0;
 
-    int fileFd = open(outputFiles[nb], O_RDWR | O_CREAT | O_TRUNC);
+    int fileFd = open(outputFiles[nb], O_RDWR | O_CREAT | O_TRUNC, 0666);
     if (fileFd < 0)
     {
         stdoutMutex.lock();
@@ -151,7 +151,6 @@ void error(const char *msg)
 void my_handler(int s)
 {
     const char *signal_name;
-    //printf("Caught signal %d from PID: %d\n", s, currentPID);
     switch (s)
     {
     case SIGHUP:
@@ -188,22 +187,25 @@ void my_handler(int s)
         signal_name = "SIGTTOU";
         break;
     case SIGINT:
-        printf("Caught SIGINT, exiting now\n");
-        exit(0);
+        signal_name = "SIGINT";
+        break;
     default:
         fprintf(stderr, "Caught wrong signal: %d\n", s);
-        return;
-        printf("Caught signal %s\n", signal_name);
+        exit(EXIT_FAILURE);
+        break;
     }
-    //kill(currentPID, SIGKILL);
-    //exit(EXIT_SUCCESS);
+    printf("Caught signal %s\n", signal_name);
+    remove("meats.txt");
+    remove("fruits.txt");
+    remove("vegetables.txt");
+    exit(0);
 }
 
 void *perform_work(void *arg)
 {
     char buffer[256];
     int nb = *((int *)arg);
-    if (nb == 0 || nb == 1 || nb == 2)
+    if (nb == 0 || nb == 1 || nb == 2 || nb == 3)
     {
         printf("Connecting %d\n", nb);
         int newsockfd;
@@ -232,7 +234,7 @@ void *perform_work(void *arg)
         while (true)
         {
             sleep(5);
-            int f = open(outputFiles[rand() % 3], O_RDONLY);
+            int f = open(outputFiles[rand() % 3], O_RDONLY, 0666);
             if (f < 0)
             {
                 stdoutMutex.lock();
@@ -342,10 +344,6 @@ void clientWork(int argc, char **argv, char **aliments)
         {
             signal(j, my_handler);
         }
-        /*
-        signal(SIGINT, my_handler);
-        signal(SIGKILL, my_handler);
-        */
         sleep(1);
         if (n < 0)
             error("ERROR writing to socket\n");
