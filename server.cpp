@@ -60,12 +60,36 @@ void handleConnection(int newsockfd, sockaddr_in *cli_addr, int nb)
     int n;
     int k = 0;
 
-    int fileFd = open(outputFiles[nb], O_RDWR | O_CREAT | O_TRUNC, 0666);
+    int fileFd = open(outputFiles[nb % 3], O_RDWR | O_CREAT, 0666);
     if (fileFd < 0)
     {
         stdoutMutex.lock();
-        std::cerr << "ERROR opening file " << outputFiles[nb] << std::endl;
+        std::cerr << "ERROR opening file " << outputFiles[nb % 3] << std::endl;
         stdoutMutex.unlock();
+        fileFd = open(outputFiles[nb % 3], O_RDONLY);
+        if (fileFd < 0)
+        {
+            stdoutMutex.lock();
+            std::cerr << "ERROR opening file for reading only" << outputFiles[nb] << std::endl;
+            stdoutMutex.unlock();
+        }
+        else
+        {
+            int rd;
+            while (true)
+            {
+                while ((rd = read(rd, buffer, 255)))
+                {
+                    stdoutMutex.lock();
+                    std::cout << buffer << std::endl;
+                    stdoutMutex.unlock();
+                }
+                stdoutMutex.lock();
+                std::cout << "-------------------" << std::endl;
+                stdoutMutex.unlock();
+                sleep(5);
+            }
+        }
     }
 
     while (true)
@@ -102,7 +126,7 @@ void handleConnection(int newsockfd, sockaddr_in *cli_addr, int nb)
                 std::vector<std::string> response = handleRequest(request, k); // Get the response
                 stdoutMutex.lock();
 
-                //std::cout << inet_ntoa(cli_addr->sin_addr) << ":" << ntohs(cli_addr->sin_port) << "  " << request << std::endl;
+                // std::cout << inet_ntoa(cli_addr->sin_addr) << ":" << ntohs(cli_addr->sin_port) << "  " << request << std::endl;
 
                 write(fileFd, request.c_str(), request.length());
                 write(fileFd, "\n", 1);
@@ -195,9 +219,11 @@ void my_handler(int s)
         break;
     }
     printf("Caught signal %s\n", signal_name);
+    /*
     remove("meats.txt");
     remove("fruits.txt");
     remove("vegetables.txt");
+    */
     exit(0);
 }
 
@@ -225,24 +251,39 @@ void *perform_work(void *arg)
         std::cout << inet_ntoa(cli_addr.sin_addr) << ":" << ntohs(cli_addr.sin_port)
                   << " connected" << std::endl;
         stdoutMutex.unlock();
-
         handleConnection(newsockfd, &cli_addr, nb);
     }
     else
     {
-        return (arg);
+        int ret;
+        char *currentFile;
         while (true)
         {
-            sleep(5);
-            int f = open(outputFiles[rand() % 3], O_RDONLY, 0666);
-            if (f < 0)
+                    return (arg);
+
+            sleep(3);
+            stdoutMutex.lock();
+            std::cout << "STARTED" << std::endl;
+            stdoutMutex.unlock();
+            currentFile = strdup(outputFiles[rand() % 3]);
+            int f = open(currentFile, O_RDONLY, 0666);
+            if (f > 0)
             {
                 stdoutMutex.lock();
-                while (read(f, buffer, strlen(buffer)))
+                std::cout << "SUCCESS" << std::endl;
+                printf("FILE: %s\n", currentFile);
+                while ((ret = read(f, buffer, strlen(buffer))) > 0)
                 {
-                    std::cout << buffer;
+                    std::cout << buffer << std::endl;
                 }
                 std::cout << " " << std::endl;
+                stdoutMutex.unlock();
+            }
+            else
+            {
+                stdoutMutex.lock();
+                std::cout << "FAIL TO WRITE \n"
+                          << std::endl;
                 stdoutMutex.unlock();
             }
         }
@@ -281,7 +322,7 @@ void serverWork(int *pids, int i, int argc, char **argv)
     if (bind(sockfd, (sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
         std::cerr << "ERROR on binding" << std::endl;
 
-    unsigned int backlogSize = NB_CHILDREN;
+    unsigned int backlogSize = NB_CHILDREN + 1;
     listen(sockfd, backlogSize);
     std::cout << "C++ server opened on port " << portno << std::endl;
     pthread_t threads[NUM_THREADS];

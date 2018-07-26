@@ -21,8 +21,8 @@ char **all[5];
 
 void my_handler(int s)
 {
-	printf("Caught signal %d\n", s);
-	exit(EXIT_SUCCESS);
+    printf("Caught signal %d\n", s);
+    exit(EXIT_SUCCESS);
 }
 
 void error(const char *msg)
@@ -61,27 +61,26 @@ void clientWork(int argc, char **argv, char **aliments)
     serv_addr.sin_port = htons(portno);
     if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
         error("ERROR connecting");
-	else
-		printf("-------------------------------------------\n\n");
+    else
+        printf("-------------------------------------------\n\n");
     while (true)
     {
         bzero(buffer, 256);
         int randNum = rand() % 5;
         strcpy(buffer, aliments[randNum]);
         n = write(sockfd, buffer, strlen(buffer));
-
+        if (n < 0)
+            error("ERROR writing to socket\n");
         for (int j = 0; j < 31; j++)
         {
             signal(j, my_handler);
         }
-		//TO SEE OUTPUT
         sleep(1);
-        if (n < 0)
-            error("ERROR writing to socket\n");
-		printf("ACTIVE PID %d: %s\n", getpid(), buffer);
+
+        printf("ACTIVE PID %d: %s | SOCKFD : %d\n", getpid(), buffer, sockfd);
         n = read(sockfd, buffer, 255);
         printf("AFTER\n");
-		if (n < 0)
+        if (n < 0)
         {
             return;
         }
@@ -123,32 +122,32 @@ void initArrays()
 int main(int argc, char **argv)
 {
 
-	int clientSocket, ret;
-	struct sockaddr_in serverAddr;
-	char buffer[1024];
-	initArrays();
+    int clientSocket, ret;
+    struct sockaddr_in serverAddr;
+    char buffer[1024];
+    initArrays();
 
-	clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-	if (clientSocket < 0)
-	{
-		printf("[-]Error in connection.\n");
-		exit(EXIT_FAILURE);
-	}
-	printf("[+]Client Socket is created.\n");
+    clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket < 0)
+    {
+        printf("[-]Error in connection.\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("[+]Client Socket is created.\n");
 
-	memset(&serverAddr, '\0', sizeof(serverAddr));
-	serverAddr.sin_family = AF_INET;
-	serverAddr.sin_port = htons(atoi(argv[1]));
-	serverAddr.sin_addr.s_addr = INADDR_ANY;
+    memset(&serverAddr, '\0', sizeof(serverAddr));
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(atoi(argv[1]));
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
 
-	ret = connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
-	if (ret < 0)
-	{
-		printf("[-]Error in connection.\n");
-		exit(1);
-	}
-	printf("[+]Connected to Server.\n");
-	clientWork(argc, argv, all[0]);
+    ret = connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+    if (ret < 0)
+    {
+        printf("[-]Error in connection.\n");
+        exit(1);
+    }
+    printf("[+]Connected to Server.\n");
+    clientWork(argc, argv, all[0]);
 
-	return EXIT_SUCCESS;
+    return EXIT_SUCCESS;
 }
